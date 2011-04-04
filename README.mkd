@@ -15,8 +15,8 @@ You'll need to get an API key and secret from http://cartodb.com
 
 Then is pretty simple
 
-   <?php
-   
+
+    <?php
     require_once 'cartodb.class.php';
 
     # Create the client using the API key and Secret.
