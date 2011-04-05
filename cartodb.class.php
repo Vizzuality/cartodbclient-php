@@ -37,15 +37,6 @@ class CartoDBClient {
       try {
           if (file_exists($this->TEMP_TOKEN_FILE_PATH)) {
               $this->credentials = unserialize(file_get_contents($this->TEMP_TOKEN_FILE_PATH));
-              //check if the token is valid
-              //Try a dummy request and see it it fails
-              $test= $this->runSql("SELECT 'ok' as foo");
-              @$res= $test->rows[0]->foo;
-              if ($res != 'ok') {
-                  //problem!
-                  unlink($this->TEMP_TOKEN_FILE_PATH);
-                  $this->credentials = $this->getAccessToken();
-              }
           } else {
               $this->credentials = $this->getAccessToken();
           }
@@ -60,11 +51,21 @@ class CartoDBClient {
   }
   
   public function runSql($sql,$decode_json=true) {
+      //error_log("runSQL($sql,$decode_json)");
       $url=$this->API_URL.'?oauth_token=' .$this->credentials['oauth_token'].'&sql='.urlencode($sql);
       $ch = curl_init($url);
       curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
       curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
       $response = curl_exec($ch);
+      $response_info = curl_getinfo($ch);
+      
+      # If the return is unauthorize must be because the temp key is not valid anymore
+      # Refresh calling the accessToken and requery.
+      if($response_info['http_code']!= 200) {
+          $this->authorized=false;
+          $this->credentials = $this->getAccessToken();
+          return $this->runSql($sql,$decode_json);
+      }
       curl_close($ch);
       if($decode_json) {
           return json_decode($response);
@@ -75,6 +76,7 @@ class CartoDBClient {
   
   
   private function getAccessToken() {
+      //error_log("getAccessToken");
       $sig_method = new OAuthSignatureMethod_HMAC_SHA1();
       $consumer = new OAuthConsumer($this->key, $this->secret, NULL);
 
@@ -134,13 +136,15 @@ class CartoDBClient {
       curl_close($ch);
 
       $credentials = $this->parse_query($response,true);
+      $this->authorized=true;
 
       #Now that we have the token, lets save it
+      unlink($this->TEMP_TOKEN_FILE_PATH);
       if($f = @fopen($this->TEMP_TOKEN_FILE_PATH,"w")) {
           if(@fwrite($f,serialize($credentials))) {
               @fclose($f);
-          } else die("Could not write to file ".$this->TEMP_TOKEN_FILE_PATH." at Persistant::save");
-      } else die("Could not open file ".$this->TEMP_TOKEN_FILE_PATH." for writing, at Persistant::save");    
+          } else die("Could not write to file ".$this->TEMP_TOKEN_FILE_PATH);
+      } else die("Could not open file ".$this->TEMP_TOKEN_FILE_PATH);    
 
       return $credentials;
 
