@@ -52,8 +52,14 @@ class CartoDBClient {
   
   public function runSql($sql,$decode_json=true) {
       //error_log("runSQL($sql,$decode_json)");
-      $url=$this->API_URL.'?oauth_token=' .$this->credentials['oauth_token'].'&sql='.urlencode($sql);
-      $ch = curl_init($url);
+      
+      # We only support GET for the moment. TODO to support POST
+      $body = 'oauth_token=' .$this->credentials['oauth_token'].'&sql='.urlencode($sql);
+      $ch = curl_init($this->API_URL);
+            
+      curl_setopt($ch, CURLOPT_POST, true);
+      curl_setopt($ch, CURLOPT_POSTFIELDS,$body);
+      
       curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
       curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
       $response = curl_exec($ch);
@@ -61,10 +67,13 @@ class CartoDBClient {
       
       # If the return is unauthorize must be because the temp key is not valid anymore
       # Refresh calling the accessToken and requery.
-      if($response_info['http_code']!= 200) {
+      if($response_info['http_code']== 401) {
           $this->authorized=false;
           $this->credentials = $this->getAccessToken();
           return $this->runSql($sql,$decode_json);
+      }
+      if($response_info['http_code']!= 200) {
+          throw new Exception("There was a problem with your request: ".$response);
       }
       curl_close($ch);
       if($decode_json) {
