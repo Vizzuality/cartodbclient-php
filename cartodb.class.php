@@ -22,17 +22,27 @@
 class CartoDBClient {
   public $key;
   public $secret;
+  public $email;
+  public $password;
+  public $cartodb_domain;
   public $authorized=false;
   private $credentials=array();
+  private $OAUTH_URL; 
+  private $API_URL;
   
-  private $OAUTH_URL = "https://api.cartodb.com/oauth/"; 
-  private $API_URL = "https://api.cartodb.com/v1";
   private $TEMP_TOKEN_FILE_PATH;
   
-  function __construct($key, $secret) {
+  function __construct($key, $secret,$email,$password,$cartodb_domain) {
       $this->key = $key;
-      $this->secret = $secret;  
+      $this->secret = $secret; 
+      $this->email = $email;
+      $this->password = $password;       
+      $this->cartodb_domain = $cartodb_domain;   
       $this->TEMP_TOKEN_FILE_PATH = sys_get_temp_dir()."/cartodbtempkey.txt"; 
+      $this->OAUTH_URL = "https://".$this->cartodb_domain.".cartodb.com/oauth/";
+      $this->API_URL = "https://".$this->cartodb_domain.".cartodb.com/api/v1/sql";
+      
+      //error_log($this->TEMP_TOKEN_FILE_PATH);
       
       try {
           if (file_exists($this->TEMP_TOKEN_FILE_PATH)) {
@@ -51,10 +61,9 @@ class CartoDBClient {
   }
   
   public function runSql($sql,$decode_json=true) {
-      //error_log("runSQL($sql,$decode_json)");
       
       # We only support GET for the moment. TODO to support POST
-      $body = 'oauth_token=' .$this->credentials['oauth_token'].'&sql='.urlencode($sql);
+      $body = 'oauth_token=' .$this->credentials['oauth_token'].'&q='.urlencode($sql);
       $ch = curl_init($this->API_URL);
             
       curl_setopt($ch, CURLOPT_POST, true);
@@ -72,6 +81,9 @@ class CartoDBClient {
           $this->credentials = $this->getAccessToken();
           return $this->runSql($sql,$decode_json);
       }
+      
+      error_log(print_r($response,true));
+      
       if($response_info['http_code']!= 200) {
           throw new Exception("There was a problem with your request: ".$response);
       }
@@ -85,77 +97,49 @@ class CartoDBClient {
   
   
   private function getAccessToken() {
-      //error_log("getAccessToken");
       $sig_method = new OAuthSignatureMethod_HMAC_SHA1();
       $consumer = new OAuthConsumer($this->key, $this->secret, NULL);
 
-
-      #request_token-------------------------------------------
-      $req_req = OAuthRequest::from_consumer_and_token($consumer, NULL, "GET", 
-                  $this->OAUTH_URL.'request_token?oauth_callback=http://wadus.com');
-
-      $req_req->sign_request($sig_method, $consumer, NULL); 
-      $ch = curl_init($req_req);
-      curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-      curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-      $response = curl_exec($ch);
-      $response_info = curl_getinfo($ch);
-      //Check is there is a problem
-      if($response_info['http_code']!= 200) {
-          throw new Exception("Authorization failed for this key and secret.");
-      }
-      
-      $token_string=$response;
-      curl_close($ch);
-      $arr=explode('&', $response);
-      $arr1=explode('=',$arr[0]);
-      $request_token= $arr1[1];
-      $arr1=explode('=',$arr[1]);
-      $request_token_secret= $arr1[1];
-
-
-      #authorizeToken---------------------------------------------
-      $auth_token = new OAuthConsumer($request_token, $request_token_secret);
-      #Here we dont need to send the full response TODO
-      $ch = curl_init($this->OAUTH_URL.'authorize?'.$response);
-      curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-      curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-      curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
-      curl_setopt($ch, CURLOPT_HEADER, TRUE);
-      $response = curl_exec($ch);
-      curl_close($ch);
-      $headers = $this->http_parse_headers($response);
-      $loc=($this->parse_query($headers['Location']));
-      $verifier=$loc["oauth_verifier"];
-      
-      if(!$verifier) {
-          throw new Exception("There was a problem on the authorize method.");
-      }
-
       #accessToken-----------------------------------------------
-      $acc_req = OAuthRequest::from_consumer_and_token($consumer, $auth_token, "GET",
-          $this->OAUTH_URL."access_token?oauth_verifier=".$verifier);
-      $acc_req->sign_request($sig_method, $consumer, $auth_token);
-      $ch = curl_init($acc_req);
+      $params = array('x_auth_username' => $this->email, 
+              'x_auth_password' => $this->password,
+              'x_auth_mode' => 'client_auth'
+              );
+              
+      $acc_req = OAuthRequest::from_consumer_and_token($consumer, NULL, "POST",
+          $this->OAUTH_URL."access_token",$params);                  
+                        
+      $acc_req->sign_request($sig_method, $consumer,NULL);
+      $ch = curl_init($this->OAUTH_URL."access_token");
+      curl_setopt($ch, CURLOPT_POST, True);
+      curl_setopt($ch, CURLOPT_POSTFIELDS, $acc_req->to_postdata());
       curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
       curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
       curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
       curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+          
       $response = curl_exec($ch);
+      $info = curl_getinfo($ch);
       curl_close($ch);
+            
+      if($info['http_code']!=200) {
+          throw new Exception("Authorization failed for this key and secret.");
+          
+      }
+      
+      
+          //Success
+          $credentials = $this->parse_query($response,true);
+          $this->authorized=true;
+          #Now that we have the token, lets save it
+          unlink($this->TEMP_TOKEN_FILE_PATH);
+          if($f = @fopen($this->TEMP_TOKEN_FILE_PATH,"w")) {
+              if(@fwrite($f,serialize($credentials))) {
+                  @fclose($f);
+              } else die("Could not write to file ".$this->TEMP_TOKEN_FILE_PATH);
+          } else die("Could not open file ".$this->TEMP_TOKEN_FILE_PATH);    
+          return $credentials;
 
-      $credentials = $this->parse_query($response,true);
-      $this->authorized=true;
-
-      #Now that we have the token, lets save it
-      unlink($this->TEMP_TOKEN_FILE_PATH);
-      if($f = @fopen($this->TEMP_TOKEN_FILE_PATH,"w")) {
-          if(@fwrite($f,serialize($credentials))) {
-              @fclose($f);
-          } else die("Could not write to file ".$this->TEMP_TOKEN_FILE_PATH);
-      } else die("Could not open file ".$this->TEMP_TOKEN_FILE_PATH);    
-
-      return $credentials;
 
 
   }
