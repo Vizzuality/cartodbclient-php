@@ -62,15 +62,22 @@ class CartoDBClient {
   
   public function runSql($sql,$decode_json=true) {
       
-      # We only support GET for the moment. TODO to support POST
-      $body = 'oauth_token=' .$this->credentials['oauth_token'].'&q='.urlencode($sql);
+      $sig_method = new OAuthSignatureMethod_HMAC_SHA1();
+      $consumer = new OAuthConsumer($this->key, $this->secret, NULL);
+      $token = new OAuthToken($this->credentials["oauth_token"], $this->credentials["oauth_token_secret"]);
+      $params = array("q" => $sql);
+
+      $acc_req = OAuthRequest::from_consumer_and_token($consumer, $token, "POST", $this->API_URL, $params);
+
+      $acc_req->sign_request($sig_method, $consumer, $token);
       $ch = curl_init($this->API_URL);
-            
       curl_setopt($ch, CURLOPT_POST, true);
-      curl_setopt($ch, CURLOPT_POSTFIELDS,$body);
-      
+      curl_setopt($ch, CURLOPT_POSTFIELDS, $acc_req->to_postdata());
       curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+      curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
       curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+      curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+
       $response = curl_exec($ch);
       $response_info = curl_getinfo($ch);
       
