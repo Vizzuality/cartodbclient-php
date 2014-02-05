@@ -20,8 +20,13 @@ $schema = array(
   'col1' => 'text',
   'col2' => 'integer'
 );
+
+$response = $cartodb->getTableVisualizations();
+print_r($response);
+
 $response = $cartodb->createTable('example', $schema);
 print_r($response);
+
 
 $response = $cartodb->addColumn('example', 'col3', 'text');
 print_r($response);
@@ -43,7 +48,7 @@ $response = $cartodb->updateRow('example', $row->id, $data);
 print_r($response);
 
 $response = $cartodb->getRow('example', $row->id);
-$print_r($response);
+print_r($response);
 
 $response = $cartodb->deleteRow('example', $row->id);
 print_r($response);
@@ -53,7 +58,6 @@ $total_rows = $response['return']['total_rows'];
 $response = $cartodb->getRecords('example', array('rows_per_page' => $total_rows));
 print_r($response);
 
-$response = $cartodb->dropTable('example');
+$response = $cartodb->dropTableVisualization('example');
 print_r($response);
-
 ?>

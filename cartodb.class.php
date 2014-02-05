@@ -39,6 +39,7 @@ class CartoDBClient {
     foreach ($config as $key => $value) {
       $this->$key = $value;
     }
+
     $this->TEMP_TOKEN_FILE_PATH = sys_get_temp_dir() . '/cartodbtempkey.txt';
     $this->OAUTH_URL = 'https://' . $this->subdomain . '.cartodb.com/oauth/';
     $this->API_URL = 'https://' . $this->subdomain . '.cartodb.com/api/v1/';
@@ -67,7 +68,8 @@ class CartoDBClient {
     $consumer = new OAuthConsumer($this->key, $this->secret, NULL);
     $token = new OAuthToken($this->credentials['oauth_token'], $this->credentials['oauth_token_secret']);
 
-    $acc_req = OAuthRequest::from_consumer_and_token($consumer, $token, $method, $url, $args['params']);
+    $params = isset($args['params']) ? $args['params'] : array();
+    $acc_req = OAuthRequest::from_consumer_and_token($consumer, $token, $method, $url, $params);
     if (!isset($args['headers']['Accept'])) {
       $args['headers']['Accept'] = 'application/json';
     }
@@ -120,8 +122,12 @@ class CartoDBClient {
     return $this->request('tables', 'POST', array('params' => $params));
   }
 
+  /**
+   * Searches for a table in all visualizations and if finds one who is a canonical visualization, 
+   * deletes it (this will delete the associated table)
+   */
   public function dropTable($table) {
-    return $this->request("tables/$table", 'DELETE');
+    trigger_error("Deprecated method. Use instead dropTableVisualization()", E_USER_NOTICE);
   }
 
   public function addColumn($table, $column_name, $column_type) {
@@ -142,8 +148,73 @@ class CartoDBClient {
     return $this->request("tables/$table/columns/$column", 'PUT', array('params' => $params));
   }
 
+  /**
+   * Returns all the data from a table given its name
+   */
+  public function getTable($table_name) {
+    return $this->request("tables/$table_name");
+  }
+
   public function getTables() {
-    return $this->request('tables');
+    trigger_error("Deprecated method. Use instead getTableVisualizations()", E_USER_NOTICE);
+  }
+
+  /**
+   * Searches for a table in all visualizations and if finds one who is a table visualization/canonical visualization, 
+   * deletes it (this will delete the associated table).
+   */
+  public function dropTableVisualization($table_name) {
+    $result = false;
+    $table_name = strtolower($table_name);
+
+    $allVisualizations = $this->getVisualizations();
+    if (!empty($allVisualizations['return']) && isset($allVisualizations['return']['visualizations'])) {
+      $tables = array();
+
+      for ($idx = 0, $size = count($allVisualizations['return']['visualizations']); $idx < $size && !$result; $idx++) {
+        if ($allVisualizations['return']['visualizations'][$idx]->type == 'table') {
+          $visTableName = strtolower($allVisualizations['return']['visualizations'][$idx]->name);
+          $visId = $allVisualizations['return']['visualizations'][$idx]->id;
+          if ($visTableName === $table_name) {
+            $result = $this->request("viz/$visId", 'DELETE');
+          }
+        }
+      }
+    }
+
+    return $result;
+  }
+
+  /**
+   * Returns all visualizations
+   */
+  public function getVisualizations() {
+    return $this->request('viz');
+  }
+
+  /**
+   * Returns all available tables, by getting a list of visualizations and then grabbing those tables 
+   * whose visualization is of type=table ('table visualization' or 'canonical visualization')
+   */
+  public function getTableVisualizations() {
+    $allVisualizations = $this->getVisualizations();
+    if (!empty($allVisualizations['return']) && isset($allVisualizations['return']['visualizations'])) {
+      $tables = array();
+
+      for ($idx = 0, $size = count($allVisualizations['return']['visualizations']); $idx < $size; $idx++) {
+        if ($allVisualizations['return']['visualizations'][$idx]->type === 'table') {
+          $tableDataResponse = $this->getTable($allVisualizations['return']['visualizations'][$idx]->name);
+          if (!empty($tableDataResponse['return'])) {
+            $tables[] = $tableDataResponse['return'];
+          }
+        }
+      }
+      unset($allVisualizations['return']['visualizations']);
+      $allVisualizations['return']['tables'] = $tables;
+      $allVisualizations['return']->total_entries = count($tables);
+    }
+
+    return $allVisualizations;
   }
 
   public function getRow($table, $row) {
