@@ -40,7 +40,7 @@ class CartoDBClient {
       $this->$key = $value;
     }
 
-    $this->TEMP_TOKEN_FILE_PATH = sys_get_temp_dir() . '/cartodbtempkey.txt';
+    $this->TEMP_TOKEN_FILE_PATH = sys_get_temp_dir() . '/' . $this->subdomain . '.cartodbtempkey.txt';
     $this->OAUTH_URL = 'https://' . $this->subdomain . '.cartodb.com/oauth/';
     $this->API_URL = 'https://' . $this->subdomain . '.cartodb.com/api/v1/';
 
@@ -105,26 +105,21 @@ class CartoDBClient {
     $response = $this->request('sql', 'POST', array('params' => $params));
 
     if ($response['info']['http_code'] != 200) {
-      throw new Exception('There was a problem with your request: ' . $response['return']);
+      throw new Exception('There was a problem with your request: ' . var_export($response['return'], true));
     }
     return $response;
   }
 
-  public function createTable($table, $schema = NULL) {
-    $params = array('name' => $table);
-    if ($schema) {
-      $cols = array();
-      foreach ($schema as $key => $value) {
-        $cols[] = "$key $value";
-      }
-      $params['schema'] = implode(',', $cols);
-    }
-    return $this->request('tables', 'POST', array('params' => $params));
+  /**
+   * Creates a new table
+   * @param string $tablename
+   */
+  public function createTable($table) {
+    return $this->request('tables', 'POST', array('params' => array('name' => $table)));
   }
 
   /**
-   * Searches for a table in all visualizations and if finds one who is a canonical visualization, 
-   * deletes it (this will delete the associated table)
+   * @deprecated
    */
   public function dropTable($table) {
     trigger_error("Deprecated method. Use instead dropTableVisualization()", E_USER_NOTICE);
@@ -155,6 +150,9 @@ class CartoDBClient {
     return $this->request("tables/$table_name");
   }
 
+  /**
+   * @deprecated
+   */
   public function getTables() {
     trigger_error("Deprecated method. Use instead getTableVisualizations()", E_USER_NOTICE);
   }
@@ -221,6 +219,11 @@ class CartoDBClient {
     return $this->request("tables/$table/records/$row");
   }
 
+  /**
+   * Inserts a single row of data in a table
+   * @param string $table Name of the table to inser the row into
+   * @param array $data [ column_name => column_value ]
+   */
   public function insertRow($table, $data) {
     $keys = implode(',', array_keys($data));
     $values = implode(',', array_values($data));
@@ -290,8 +293,8 @@ class CartoDBClient {
     //Success
     $credentials = $this->parse_query($response, true);
     $this->authorized = true;
-    #Now that we have the token, lets save it
-    unlink($this->TEMP_TOKEN_FILE_PATH);
+    // Now that we have the token, lets save it
+    @unlink($this->TEMP_TOKEN_FILE_PATH);
     if ($f = @fopen($this->TEMP_TOKEN_FILE_PATH, 'w')) {
       if (@fwrite($f, serialize($credentials))) {
         @fclose($f);

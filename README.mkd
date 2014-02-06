@@ -39,6 +39,6 @@ Then is pretty simple
 We are working still on the docs, but basically you can run any SQL supported by PostgreSQL and PostGIS. You can also concatenate the queries with ";" to insert multiple records in one shot for example.
 
 ## Changelog
-
+* 2014/02/06 : `createTable()` signature modified (no longer supports sending schema, just table name). Improved documentation of insertRow() method and token tmp storage to allow multi-account testing.
 * 2014/02/05 : Deprecated `getTables()` and `dropTable()`, no longer present in the API endpoints. Added `getTableVisualizations()` and `dropTableVisualization()` to provide same functionality (although slower and performing more queries).
 
