@@ -22,6 +22,8 @@ print_r($response);
 
 $response = $cartodb->createTable($tableName);
 print_r($response);
+// Update table name since it could previously exist and we got an alternative name
+$tableName = $response['return']['name'];
 
 $response = $cartodb->addColumn($tableName, 'col3', 'text');
 print_r($response);
