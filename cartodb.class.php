@@ -229,7 +229,7 @@ class CartoDBClient {
     $values = implode(',', array_values($data));
     $sql = "INSERT INTO $table ($keys) VALUES($values);";
     $sql .= "SELECT $table.cartodb_id as id, $table.* FROM $table ";
-    $sql .= "WHERE cartodb_id = currval('public." . $table . "_cartodb_id_seq');";
+    $sql .= "WHERE cartodb_id = currval('" . $table . "_cartodb_id_seq');";
     return $this->runSql($sql);
   }
 
@@ -238,7 +238,7 @@ class CartoDBClient {
     $values = implode(',', array_values($data));
     $sql = "UPDATE $table SET ($keys) = ($values) WHERE cartodb_id = $row_id;";
     $sql .= "SELECT $table.cartodb_id as id, $table.* FROM $table ";
-    $sql .= "WHERE cartodb_id = currval('public." . $table . "_cartodb_id_seq');";
+    $sql .= "WHERE cartodb_id = currval('" . $table . "_cartodb_id_seq');";
     return $this->runSql($sql);
   }
 
