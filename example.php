@@ -9,7 +9,7 @@ $cartodb =  new CartoDBClient($config);
 // Check if the $key and $secret work fine and you are authorized
 if (!$cartodb->authorized) {
   error_log("uauth");
-  print 'There is a problem authenticating, check the key and secret.';
+  print 'There is a problem authenticating, check the key and secret.\n';
   exit();
 }
 
@@ -54,7 +54,9 @@ print_r($response);
 $response = $cartodb->deleteRow($tableName, $row->id);
 print_r($response);
 
-$response = $cartodb->getRecords($tableName, array('rows_per_page' => 0));
+
+$response = $cartodb->getRecords($tableName, array('rows_per_page' => null));
+print_r($response);
 $total_rows = $response['return']['total_rows'];
 $response = $cartodb->getRecords($tableName, array('rows_per_page' => $total_rows));
 print_r($response);

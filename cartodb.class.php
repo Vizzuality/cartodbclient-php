@@ -43,6 +43,7 @@ class CartoDBClient {
     $this->TEMP_TOKEN_FILE_PATH = sys_get_temp_dir() . '/' . $this->subdomain . '.cartodbtempkey.txt';
     $this->OAUTH_URL = 'https://' . $this->subdomain . '.cartodb.com/oauth/';
     $this->API_URL = 'https://' . $this->subdomain . '.cartodb.com/api/v1/';
+    $this->API_URL_V2 = 'https://' . $this->subdomain . '.cartodb.com/api/v2/';
 
     try {
       if (file_exists($this->TEMP_TOKEN_FILE_PATH)) {
@@ -62,7 +63,8 @@ class CartoDBClient {
     return "OAuthConsumer[key=$this->key, secret=$this->secret]";
   }
 
-  private function request($uri, $method = 'GET', $args = array()) {
+  private function request($uri, $method = 'GET', $args = array(), $apiVersion = 1) {
+    $url = ($apiVersion == 2 ? $this->API_URL_V2 : $this->API_URL) . $uri;
     $url = $this->API_URL . $uri;
     $sig_method = new OAuthSignatureMethod_HMAC_SHA1();
     $consumer = new OAuthConsumer($this->key, $this->secret, NULL);
@@ -100,9 +102,14 @@ class CartoDBClient {
     return $response;
   }
 
-  public function runSql($sql) {
-    $params = array('q' => $sql);
-    $response = $this->request('sql', 'POST', array('params' => $params));
+  public function runSql($sql, $additionalParams = array()) {
+    $params = array_merge(array(
+      'q' => $sql,
+      'rows_per_page' => 40,
+      'page' => 0,
+      ), $additionalParams);
+
+    $response = $this->request('sql', 'POST', array('params' => $params), 2);
 
     if ($response['info']['http_code'] != 200) {
       throw new Exception('There was a problem with your request: ' . var_export($response['return'], true));
@@ -256,7 +263,7 @@ class CartoDBClient {
    *   - 'page' : Page index.
    */
   public function getRecords($table, $params = array()) {
-    return $this->request("tables/$table/records", 'GET', array('params' => $params));
+    return $this->runSql("SELECT * FROM $table", $params);
   }
 
   private function getAccessToken() {
