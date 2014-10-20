@@ -234,18 +234,16 @@ class CartoDBClient {
   public function insertRow($table, $data) {
     $keys = implode(',', array_keys($data));
     $values = implode(',', array_values($data));
-    $sql = "INSERT INTO $table ($keys) VALUES($values);";
-    $sql .= "SELECT $table.cartodb_id as id, $table.* FROM $table ";
-    $sql .= "WHERE cartodb_id = currval('" . $table . "_cartodb_id_seq');";
+    $sql =  "INSERT INTO $table ($keys) VALUES($values) ";
+    $sql .= "RETURNING *;";
     return $this->runSql($sql);
   }
 
   public function updateRow($table, $row_id, $data) {
     $keys = implode(',', array_keys($data));
     $values = implode(',', array_values($data));
-    $sql = "UPDATE $table SET ($keys) = ($values) WHERE cartodb_id = $row_id;";
-    $sql .= "SELECT $table.cartodb_id as id, $table.* FROM $table ";
-    $sql .= "WHERE cartodb_id = currval('" . $table . "_cartodb_id_seq');";
+    $sql =  "UPDATE $table SET ($keys) = ($values) WHERE cartodb_id = $row_id ";
+    $sql .= "RETURNING *;";
     return $this->runSql($sql);
   }
 
