@@ -1,5 +1,5 @@
 # IMPORTANT
-This library is deprecated and isn't going to be updated anymore. Please, take in consideration using the [CartoDB SQL API](https://github.com/CartoDB/CartoDB-SQL-API) instead, whose documentation is available [here](http://docs.cartodb.com/cartodb-platform/sql-api.html).
+This library is **deprecated** and isn't going to be updated anymore. Please, take in consideration using the [CartoDB SQL API](https://github.com/CartoDB/CartoDB-SQL-API) instead, whose documentation is available [here](http://docs.cartodb.com/cartodb-platform/sql-api.html).
 
 
 If you have any questions don't hesitate to send us an email to [support@cartodb.com](mailto:support@cartodb.com).
